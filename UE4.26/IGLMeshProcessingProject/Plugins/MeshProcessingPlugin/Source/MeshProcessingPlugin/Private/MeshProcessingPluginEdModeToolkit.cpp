@@ -46,28 +46,28 @@ void FMeshProcessingPluginEdModeToolkit::BuildToolPalette(FName PaletteIndex, cl
 
 
 
-class FHideObjectNamesDetailRootObjectCustomization : public IDetailRootObjectCustomization
-{
-public:
-	FHideObjectNamesDetailRootObjectCustomization()
-	{
-	}
-
-	virtual TSharedPtr<SWidget> CustomizeObjectHeader(const UObject* InRootObject) override
-	{
-		return SNew(STextBlock).Text(FText::FromString(InRootObject->GetName()));
-	}
-
-	virtual bool IsObjectVisible(const UObject* InRootObject) const override
-	{
-		return true;
-	}
-
-	virtual bool ShouldDisplayHeader(const UObject* InRootObject) const override
-	{
-		return false;
-	}
-};
+//class FHideObjectNamesDetailRootObjectCustomization : public IDetailRootObjectCustomization
+//{
+//public:
+//	FHideObjectNamesDetailRootObjectCustomization()
+//	{
+//	}
+//
+//	virtual TSharedPtr<SWidget> CustomizeObjectHeader(const UObject* InRootObject) override
+//	{
+//		return SNew(STextBlock).Text(FText::FromString(InRootObject->GetName()));
+//	}
+//
+//	virtual bool IsObjectVisible(const UObject* InRootObject) const override
+//	{
+//		return true;
+//	}
+//
+//	virtual bool ShouldDisplayHeader(const UObject* InRootObject) const override
+//	{
+//		return false;
+//	}
+//};
 
 
 
@@ -86,9 +86,9 @@ void FMeshProcessingPluginEdModeToolkit::Init(const TSharedPtr<IToolkitHost>& In
 	DetailsView = PropertyEditorModule.CreateDetailView(DetailsViewArgs);
 
 	// add customization that hides header labels
-	TSharedPtr<FHideObjectNamesDetailRootObjectCustomization> RootObjectCustomization
-		= MakeShared<FHideObjectNamesDetailRootObjectCustomization>();
-	DetailsView->SetRootObjectCustomizationInstance(RootObjectCustomization);
+	//TSharedPtr<FHideObjectNamesDetailRootObjectCustomization> RootObjectCustomization
+	//	= MakeShared<FHideObjectNamesDetailRootObjectCustomization>();
+	//DetailsView->SetRootObjectCustomizationInstance(RootObjectCustomization);
 
 	ToolNameLabel = SNew(STextBlock).AutoWrapText(true);
 	ToolNameLabel->SetJustification(ETextJustify::Center);
@@ -151,7 +151,7 @@ void FMeshProcessingPluginEdModeToolkit::GetToolPaletteNames(TArray<FName>& InPa
 	InPaletteName = ToolbarPaletteNames;
 }
 
-FText FMeshProcessingPluginEdModeToolkit::GetToolPaletteDisplayName(FName Palette)
+FText FMeshProcessingPluginEdModeToolkit::GetToolPaletteDisplayName(FName Palette) const
 {
 	return FText::FromName(Palette);
 }

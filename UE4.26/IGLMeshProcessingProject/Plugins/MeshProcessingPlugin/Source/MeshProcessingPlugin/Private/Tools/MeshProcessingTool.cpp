@@ -113,7 +113,7 @@ void UMeshProcessingTool::Shutdown(EToolShutdownType ShutdownType)
 {
 	ComponentTarget->SetOwnerVisibility(true);
 	
-	TUniquePtr<FDynamicMeshOpResult> Result = Preview->Shutdown();
+	FDynamicMeshOpResult Result = Preview->Shutdown();
 
 	if (ShutdownType == EToolShutdownType::Accept)
 	{
@@ -121,19 +121,19 @@ void UMeshProcessingTool::Shutdown(EToolShutdownType ShutdownType)
 
 		bool bIsTopologyEdit = DoesEditChangeMeshTopology();
 
-		ComponentTarget->CommitMesh([&Result, bIsTopologyEdit](FMeshDescription* MeshDescription)
+		ComponentTarget->CommitMesh([&Result, bIsTopologyEdit](const FPrimitiveComponentTarget::FCommitParams& CommitParams)
 		{
 			FDynamicMeshToMeshDescription Converter;
 
 			if (bIsTopologyEdit)
 			{
 				// only update vertex positions and normals
-				Converter.Update(Result->Mesh.Get(), *MeshDescription);
+				Converter.Update(Result.Mesh.Get(), *CommitParams.MeshDescription);
 			}
 			else
 			{
 				// full conversion 
-				Converter.Convert(Result->Mesh.Get(), *MeshDescription);
+				Converter.Convert(Result.Mesh.Get(), *CommitParams.MeshDescription);
 			}
 		});
 
@@ -149,7 +149,7 @@ void UMeshProcessingTool::RequestInvalidation()
 }
 
 
-void UMeshProcessingTool::Tick(float DeltaTime)
+void UMeshProcessingTool::OnTick(float DeltaTime)
 {
 	if (bInvalidationRequested)
 	{
@@ -161,9 +161,9 @@ void UMeshProcessingTool::Tick(float DeltaTime)
 }
 
 
-TSharedPtr<FDynamicMeshOperator> UMeshProcessingTool::MakeNewOperator()
+TUniquePtr<FDynamicMeshOperator> UMeshProcessingTool::MakeNewOperator()
 {
-	TSharedPtr<FMeshProcessingOp> Op = MakeShared<FMeshProcessingOp>();
+	TUniquePtr<FMeshProcessingOp> Op = MakeUnique<FMeshProcessingOp>();
 	Op->InputMesh = InputMeshCopy;
 	Op->InputTransform = FTransform3d(ComponentTarget->GetWorldTransform());
 
@@ -183,7 +183,7 @@ TUniqueFunction<void(FDynamicMesh3&)> UMeshProcessingTool::MakeMeshProcessingFun
 		for (int32 vid : ResultMesh.VertexIndicesItr())
 		{
 			FVector3d Position = ResultMesh.GetVertex(vid);
-			FVector3f Normal = Normals[vid];
+			FVector3d Normal = Normals[vid];
 			ResultMesh.SetVertex(vid, Position + (FVector3d)Normal);
 		}
 	};
@@ -201,7 +201,7 @@ void UMeshProcessingTool::Render(IToolsContextRenderAPI* RenderAPI)
 }
 
 
-void UMeshProcessingTool::OnPropertyModified(UObject* PropertySet, UProperty* Property)
+void UMeshProcessingTool::OnPropertyModified(UObject* PropertySet, FProperty* Property)
 {
 	RequestInvalidation();
 }

@@ -24,7 +24,7 @@ public:
 
 	/** Returns the Mode specific tabs in the mode toolbar **/
 	virtual void GetToolPaletteNames(TArray<FName>& InPaletteName) const;
-	virtual FText GetToolPaletteDisplayName(FName PaletteName);
+	virtual FText GetToolPaletteDisplayName(FName PaletteName) const;
 	virtual void BuildToolPalette(FName PaletteName, class FToolBarBuilder& ToolbarBuilder);
 
 	virtual FMeshProcessingPluginEdMode* GetMeshProcessingPluginEdMode() const;
