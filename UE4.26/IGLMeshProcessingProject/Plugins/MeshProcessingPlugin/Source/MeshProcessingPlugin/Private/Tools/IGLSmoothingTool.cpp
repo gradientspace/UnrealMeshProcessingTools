@@ -2,24 +2,36 @@
 #include "Tools/IGLIncludes.h"		// include this before your igl includes (or add them to the list there)
 #include "Tools/IGLUtil.h"
 
-UMeshProcessingTool* UIGLSmoothingToolBuilder::MakeNewMeshProcessingTool(const FToolBuilderState& SceneState) const
+
+#define LOCTEXT_NAMESPACE "UIGLSmoothingTool"
+
+
+
+void UIGLSmoothingTool::InitializeProperties()
 {
-	return NewObject<UIGLSmoothingTool>(SceneState.ToolManager);
+	SmoothProperties = NewObject<UIGLSmoothingToolProperties>(this);
+	AddToolPropertySource(SmoothProperties);
+	SmoothProperties->RestoreProperties(this);
+	SmoothProperties->WatchProperty(SmoothProperties->Smoothness, [&](float) { InvalidateResult(); });
+	SmoothProperties->WatchProperty(SmoothProperties->Iterations, [&](int) { InvalidateResult(); });
+
+	UMeshProcessingTool::InitializeProperties();		// allow base class to add shared properties
 }
 
-void UIGLSmoothingTool::RegisterProperties()
+
+void UIGLSmoothingTool::OnShutdown(EToolShutdownType ShutdownType)
 {
-	Properties = NewObject<UIGLSmoothingToolProperties>(this);
-	AddToolPropertySource(Properties);
-	UMeshProcessingTool::RegisterProperties();
+	UMeshProcessingTool::OnShutdown(ShutdownType);
+	SmoothProperties->SaveProperties(this);
 }
+
 
 TUniqueFunction<void(FDynamicMesh3&)> UIGLSmoothingTool::MakeMeshProcessingFunction()
 {
 	// Do *not* use & capture or reference this class directly in the lambda constructed below.
 	// Make copies of values. Otherwise compute thread may reference changing values.
-	int SolveIterations = Properties->Iterations;
-	float Smoothness = Properties->Smoothness;
+	int SolveIterations = SmoothProperties->Iterations;
+	float Smoothness = SmoothProperties->Smoothness / 10000.0;
 
 	// construct compute lambda
 	auto EditFunction = [Smoothness, SolveIterations](FDynamicMesh3& ResultMesh)
@@ -57,3 +69,6 @@ TUniqueFunction<void(FDynamicMesh3&)> UIGLSmoothingTool::MakeMeshProcessingFunct
 
 	return MoveTemp(EditFunction);  // return compute lambda
 }
+
+
+#undef LOCTEXT_NAMESPACE

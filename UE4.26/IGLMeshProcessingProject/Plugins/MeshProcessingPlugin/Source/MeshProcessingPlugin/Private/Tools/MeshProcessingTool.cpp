@@ -1,176 +1,85 @@
 #include "Tools/MeshProcessingTool.h"
 #include "InteractiveToolManager.h"
-#include "ToolBuilderUtil.h"
-#include "DynamicMesh3.h"
-#include "MeshDescriptionToDynamicMesh.h"
-#include "DynamicMeshToMeshDescription.h"
-#include "AssetGenerationUtil.h"
-#include "ToolSetupUtil.h"
 #include "MeshNormals.h"
 
 #define LOCTEXT_NAMESPACE "UMeshProcessingTool"
 
 
-bool UMeshProcessingToolBuilder::CanBuildTool(const FToolBuilderState& SceneState) const
+
+
+class FMeshProcessingOp : public FDynamicMeshOperator
 {
-	return ToolBuilderUtil::CountComponents(SceneState, CanMakeComponentTarget) == 1;
-}
+public:
+	virtual ~FMeshProcessingOp() {}
 
-UInteractiveTool* UMeshProcessingToolBuilder::BuildTool(const FToolBuilderState& SceneState) const
-{
-	UMeshProcessingTool* NewTool = MakeNewMeshProcessingTool(SceneState);
+	TUniqueFunction<void(FDynamicMesh3&)> MeshProcessingFunc;
 
-	UActorComponent* ActorComponent = ToolBuilderUtil::FindFirstComponent(SceneState, CanMakeComponentTarget);
-	auto* MeshComponent = Cast<UPrimitiveComponent>(ActorComponent);
-	check(MeshComponent != nullptr);
-
-	NewTool->SetSelection(MakeComponentTarget(MeshComponent));
-
-	return NewTool;
-}
-
-
-UMeshProcessingTool* UMeshProcessingToolBuilder::MakeNewMeshProcessingTool(const FToolBuilderState& SceneState) const
-{
-	return NewObject<UMeshProcessingTool>(SceneState.ToolManager);
-}
-
-
-
-
-
-void FMeshProcessingOp::CalculateResult(FProgressCancel* Progress)
-{
-	ResultMesh->Copy(*InputMesh);
-	ResultTransform = InputTransform;
-
-	if (Progress->Cancelled())
+	FMeshProcessingOp(
+		const FDynamicMesh3& InputMesh,
+		const FTransform3d& TransformIn,
+		TUniqueFunction<void(FDynamicMesh3&)> MeshProcessingFuncIn )
 	{
-		return;
+		ResultMesh = MakeUnique<FDynamicMesh3>(InputMesh);
+		SetResultTransform(TransformIn);
+		MeshProcessingFunc = MoveTemp(MeshProcessingFuncIn);
 	}
 
-	if (CalculateResultFunc)
+	virtual void CalculateResult(FProgressCancel* Progress) override
 	{
-		CalculateResultFunc(*ResultMesh);
+		if (Progress->Cancelled())
+		{
+			return;
+		}
+
+		if (MeshProcessingFunc)
+		{
+			MeshProcessingFunc(*ResultMesh);
+		}
+
+		if (Progress->Cancelled())
+		{
+			return;
+		}
+
+		if (ResultMesh->HasAttributes() && ResultMesh->Attributes()->NumNormalLayers() == 1)
+		{
+			FDynamicMeshNormalOverlay* NormalsAttrib = ResultMesh->Attributes()->GetNormalLayer(0);
+			FMeshNormals Normals(&*ResultMesh);
+			Normals.RecomputeOverlayNormals(NormalsAttrib);
+			Normals.CopyToOverlay(NormalsAttrib);
+		}
 	}
-
-	if (Progress->Cancelled())
-	{
-		return;
-	}
-
-	if (ResultMesh->HasAttributes() && ResultMesh->Attributes()->NumNormalLayers() == 1)
-	{
-		FDynamicMeshNormalOverlay* NormalsAttrib = ResultMesh->Attributes()->GetNormalLayer(0);
-		FMeshNormals Normals(&*ResultMesh);
-		Normals.RecomputeOverlayNormals(NormalsAttrib);
-		Normals.CopyToOverlay(NormalsAttrib);
-	}
-}
+};
 
 
 
 
 
-
-UMeshProcessingTool::UMeshProcessingTool()
-{
-}
-
-
-void UMeshProcessingTool::Setup()
-{
-	UInteractiveTool::Setup();
-
-	Preview = NewObject<UMeshOpPreviewWithBackgroundCompute>(this, "Preview");
-	Preview->Setup(ComponentTarget->GetOwnerActor()->GetWorld(), this);
-	Preview->PreviewMesh->SetTransform(ComponentTarget->GetWorldTransform());
-	Preview->PreviewMesh->InitializeMesh(ComponentTarget->GetMesh());
-	Preview->ConfigureMaterials(
-		ToolSetupUtil::GetDefaultMaterial(GetToolManager(), ComponentTarget->GetMaterial(0)),
-		ToolSetupUtil::GetDefaultWorkingMaterial(GetToolManager())
-	);
-
-	RegisterProperties();
-
-	InputMeshCopy = MakeShared<FDynamicMesh3>(*Preview->PreviewMesh->GetPreviewDynamicMesh());
-
-	ComponentTarget->SetOwnerVisibility(false);
-	Preview->SetVisibility(true);
-
-	RequestInvalidation();
-}
-
-
-void UMeshProcessingTool::RegisterProperties()
+void UMeshProcessingTool::InitializeProperties()
 {
 	MeshProcessingSettings = NewObject<UMeshProcessingToolProperties>(this);
 	AddToolPropertySource(MeshProcessingSettings);
+	MeshProcessingSettings->WatchProperty(MeshProcessingSettings->bShowWireframe,
+		[this](bool bWireframe) { GetUPreviewMesh()->EnableWireframe(bWireframe); } );
 }
 
 
-void UMeshProcessingTool::Shutdown(EToolShutdownType ShutdownType)
+void UMeshProcessingTool::OnShutdown(EToolShutdownType ShutdownType)
 {
-	ComponentTarget->SetOwnerVisibility(true);
-	
-	FDynamicMeshOpResult Result = Preview->Shutdown();
-
-	if (ShutdownType == EToolShutdownType::Accept)
-	{
-		GetToolManager()->BeginUndoTransaction(LOCTEXT("MeshProcessingToolTransactionName", "Edit Mesh"));
-
-		bool bIsTopologyEdit = DoesEditChangeMeshTopology();
-
-		ComponentTarget->CommitMesh([&Result, bIsTopologyEdit](const FPrimitiveComponentTarget::FCommitParams& CommitParams)
-		{
-			FDynamicMeshToMeshDescription Converter;
-
-			if (bIsTopologyEdit)
-			{
-				// only update vertex positions and normals
-				Converter.Update(Result.Mesh.Get(), *CommitParams.MeshDescription);
-			}
-			else
-			{
-				// full conversion 
-				Converter.Convert(Result.Mesh.Get(), *CommitParams.MeshDescription);
-			}
-		});
-
-		GetToolManager()->EndUndoTransaction();
-	}
+	MeshProcessingSettings->SaveProperties(this);
 }
 
-
-
-void UMeshProcessingTool::RequestInvalidation()
-{
-	bInvalidationRequested = true;
-}
-
-
-void UMeshProcessingTool::OnTick(float DeltaTime)
-{
-	if (bInvalidationRequested)
-	{
-		Preview->InvalidateResult();
-		bInvalidationRequested = false;
-	}
-
-	Preview->Tick(DeltaTime);
-}
 
 
 TUniquePtr<FDynamicMeshOperator> UMeshProcessingTool::MakeNewOperator()
 {
-	TUniquePtr<FMeshProcessingOp> Op = MakeUnique<FMeshProcessingOp>();
-	Op->InputMesh = InputMeshCopy;
-	Op->InputTransform = FTransform3d(ComponentTarget->GetWorldTransform());
-
-	Op->CalculateResultFunc = MakeMeshProcessingFunction();
-
-	return Op;
+	return MakeUnique<FMeshProcessingOp>(
+		GetInitialMesh(), 
+		FTransform3d(GetPreviewTransform()), 
+		MakeMeshProcessingFunction());
 }
+
+
 
 
 TUniqueFunction<void(FDynamicMesh3&)> UMeshProcessingTool::MakeMeshProcessingFunction()
@@ -188,33 +97,9 @@ TUniqueFunction<void(FDynamicMesh3&)> UMeshProcessingTool::MakeMeshProcessingFun
 		}
 	};
 
-
 	return MoveTemp(EditFunction);
 }
 
-
-
-
-void UMeshProcessingTool::Render(IToolsContextRenderAPI* RenderAPI)
-{
-	Preview->PreviewMesh->EnableWireframe(MeshProcessingSettings->bShowWireframe);
-}
-
-
-void UMeshProcessingTool::OnPropertyModified(UObject* PropertySet, FProperty* Property)
-{
-	RequestInvalidation();
-}
-
-bool UMeshProcessingTool::HasAccept() const
-{
-	return true;
-}
-
-bool UMeshProcessingTool::CanAccept() const
-{
-	return Preview->HaveValidResult();
-}
 
 
 
