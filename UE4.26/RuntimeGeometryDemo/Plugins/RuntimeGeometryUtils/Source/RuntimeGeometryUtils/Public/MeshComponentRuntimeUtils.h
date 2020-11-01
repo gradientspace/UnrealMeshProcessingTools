@@ -31,6 +31,7 @@ namespace RTGUtils
 		const FDynamicMesh3* Mesh,
 		bool bUseFaceNormals,
 		bool bInitializeUV0,
-		bool bInitializePerVertexColors);
+		bool bInitializePerVertexColors,
+		bool bCreateCollision);
 
 }

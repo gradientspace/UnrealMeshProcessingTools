@@ -42,7 +42,8 @@ void RTGUtils::UpdatePMCFromDynamicMesh_SplitTriangles(
 	const FDynamicMesh3* Mesh,
 	bool bUseFaceNormals,
 	bool bInitializeUV0,
-	bool bInitializePerVertexColors)
+	bool bInitializePerVertexColors,
+	bool bCreateCollision)
 {
 	Component->ClearAllMeshSections();
 
@@ -143,5 +144,5 @@ void RTGUtils::UpdatePMCFromDynamicMesh_SplitTriangles(
 		Triangles[k+2] = k+2;
 	}
 
-	Component->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UV0, VtxColors, Tangents, false);
+	Component->CreateMeshSection_LinearColor(0, Vertices, Triangles, Normals, UV0, VtxColors, Tangents, bCreateCollision);
 }

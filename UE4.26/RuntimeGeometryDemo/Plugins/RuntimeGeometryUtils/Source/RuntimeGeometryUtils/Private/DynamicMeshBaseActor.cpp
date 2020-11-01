@@ -372,13 +372,17 @@ void ADynamicMeshBaseActor::CopyFromMesh(ADynamicMeshBaseActor* OtherMesh, bool 
 {
 	if (! ensure(OtherMesh) ) return;
 
+	// the part where we generate a new mesh
 	FDynamicMesh3 TmpMesh;
 	OtherMesh->GetMeshCopy(TmpMesh);
+
+	// apply our normals setting
 	if (bRecomputeNormals)
 	{
 		RecomputeNormals(TmpMesh);
 	}
 
+	// update the mesh
 	EditMesh([&](FDynamicMesh3& MeshToUpdate)
 	{
 		MeshToUpdate = MoveTemp(TmpMesh);

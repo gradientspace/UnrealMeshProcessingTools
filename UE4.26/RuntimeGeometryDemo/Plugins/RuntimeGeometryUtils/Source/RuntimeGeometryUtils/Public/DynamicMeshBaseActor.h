@@ -54,6 +54,16 @@ enum class EDynamicMeshActorBooleanOperation : uint8
 };
 
 
+UENUM(BlueprintType)
+enum class EDynamicMeshActorCollisionMode : uint8
+{
+	NoCollision,
+	ComplexAsSimple,
+	ComplexAsSimpleAsync
+};
+
+
+
 /**
  * ADynamicMeshBaseActor is a base class for Actors that support being
  * rebuilt in-game after mesh editing operations. The base Actor itself
@@ -215,7 +225,7 @@ protected:
 	//
 	// Support for AABBTree / Spatial Queries
 	//
-protected:
+public:
 	UPROPERTY(EditAnywhere, Category = SpatialQueryOptions)
 	bool bEnableSpatialQueries = false;
 
@@ -229,7 +239,12 @@ protected:
 	TUniquePtr<TFastWindingTree<FDynamicMesh3>> FastWinding;
 
 
-
+	//
+	// Support for Runtime-Generated Collision
+	//
+public:
+	UPROPERTY(EditAnywhere, Category = RuntimeCollisionOptions)
+	EDynamicMeshActorCollisionMode CollisionMode = EDynamicMeshActorCollisionMode::NoCollision;
 
 
 	//
