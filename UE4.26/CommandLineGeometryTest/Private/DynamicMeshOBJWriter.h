@@ -12,7 +12,7 @@ public:
 
 	std::ofstream FileOut;
 
-	TFunction<bool(const FString&)> OpenFile = [this](const FString& Path) { FileOut.open(*Path, std::ofstream::out | std::ofstream::trunc); return !!FileOut; };
+	TFunction<bool(const FString&)> OpenFile = [this](const FString& Path) { FileOut.open(TCHAR_TO_ANSI(*Path), std::ofstream::out | std::ofstream::trunc); return !!FileOut; };
 	TFunction<void()> CloseFile = [this]() { FileOut.close(); };
 	TFunction<void(const TCHAR*)> WriteLine = [this](const TCHAR* Line) { FileOut << TCHAR_TO_ANSI(Line) << std::endl; };
 
